@@ -39,17 +39,9 @@ class GolfEnv(gym.Env):
         self.reached = 5 # within 5 meters means u got it
         self.obstacles = 3 # traps
         self.max_obstacle_size = 100 # size of trap
-        self.wind = random.randint(-15, 15) # wind speed
-        self.obstacles_array = []
-
-        ''' details '''
-        self.episodes = 10 # 10 courses
         self.steps = 10 # only get 10 golf swings
-        self.runtime = 0
-        self.dist = 0
-        self.curr = 0
 
-        self.generate_track()
+        self.reset()
 
     def generate_track(self):
         self.dist = random.randint(self.min_dist,self.max_dist)
@@ -62,30 +54,41 @@ class GolfEnv(gym.Env):
         self.obstacles_array.append([start,self.dist])
 
     def step(self,action):
+        exceeded = False
         club, velocity = action
         angle = self.clubs[club]
         distance = self.calcLocation(velocity, angle)
 
         self.curr += distance
         if self.curr > self.dist:
-            print("Over")
+            exceeded = True
+
         trapped = True
         for tuple in self.obstacles_array:
             if self.curr>tuple[0] and self.curr<tuple[1]:
                 trapped = False
                 break
         if trapped:
-            print("Over")
-
+            exceeded = True
         self.runtime +=1
 
         if self.runtime>self.steps:
-            print("Exceeded")
+            exceeded = True
+        if exceeded:
+            return self._get_obs(), -1, True, {}
 
-        print(self.curr)
-        print(self.obstacles_array)
+        distance = abs(self.dist-self.curr)
+        if distance < self.reached:
+            return self._get_obs(), 1, True, {}
+        else:
+            obs = self._get_obs()
+            self.wind = random.randint(-15, 15)
+            return obs, distance/self.dist, False, {}
 
-        return
+    def _get_obs(self):
+        temp = np.array(self.obstacles_array)-self.curr
+        temp = np.append(temp,self.wind)
+        return temp
 
     def calcLocation(self, velocity, angle):
 
@@ -101,6 +104,15 @@ class GolfEnv(gym.Env):
             horizontal_vel = horizontal_vel + self.wind
 
         return horizontal_dist
+
+    def reset(self):
+        self.wind = random.randint(-15, 15)
+        self.runtime = 0
+        self.dist = 0
+        self.curr = 0
+        self.obstacles_array = []
+        self.generate_track()
+        return self._get_obs()
 
 if __name__ == "__main__":
     env = GolfEnv()
