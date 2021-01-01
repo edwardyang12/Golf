@@ -7,10 +7,10 @@ import numpy as np
 # 2D golf where objective is for player to put the ball into the hole
 # farthest can launch ball is shorter than distance to hole
 # Start and end height constant
-# Wind held constant per map
+# Wind changes per hit
 # Different clubs with different amounts of "power" and different preset angles
 # intuition is that with these different angles, wind will affect them by different amounts
-# Outputs: distance to hole
+# Outputs: distance to hole and to each trap state
 # Input: which club to use and how far to launch
 
 # next iteration will add these:
@@ -42,7 +42,7 @@ class GolfEnv(gym.Env):
 
 
         # first iteration just power no golf clubs
-        self.action_space = spaces.Box(low=np.array([0]),high=np.array([30]))
+        self.action_space = spaces.Box(low=np.array([0]),high=np.array([50]))
         high = np.array([1]*(2*(self.obstacles+1)))
         high = np.append(high,5)
         low = np.array([0]*(2*(self.obstacles+1)))
@@ -75,6 +75,7 @@ class GolfEnv(gym.Env):
         distance = self.calcLocation(velocity, angle)
 
         self.curr += distance
+        self.path.append(self.curr)
 
         trapped = True
         for tuple in self.obstacles_array:
@@ -137,6 +138,11 @@ class GolfEnv(gym.Env):
         self.obstacles_array = []
         self.generate_track()
         return self._get_obs()
+
+    def render(self, mode='human', close=False):
+        if not close:
+            print("target: " + str(self.dist))
+            print("path: " + str(self.path))
 
 if __name__ == "__main__":
     env = GolfEnv()
