@@ -37,15 +37,28 @@ class GolfEnv(gym.Env):
         self.clubs = {0:10,1:27,2:42,3:60}
         self.min_dist = 400
         self.reached = 5 # within 5 meters means u got it
-        self.obstacles = 3 # traps
-        self.max_obstacle_size = 100 # size of trap
+        self.obstacles = 0 # traps
         self.steps = 10 # only get 10 golf swings
+
+
+        # first iteration just power no golf clubs
+        self.action_space = spaces.Box(low=np.array([0]),high=np.array([30]))
+        high = np.array([1]*(2*(self.obstacles+1)))
+        high = np.append(high,5)
+        low = np.array([0]*(2*(self.obstacles+1)))
+        low = np.append(low,-5)
+        self.observation_space = spaces.Box(
+            low = low,
+            high = high,
+            dtype=np.float32
+        )
 
         self.reset()
 
     def generate_track(self):
         self.dist = random.randint(self.min_dist,self.max_dist)
-        size_array = [random.randint(0,self.max_obstacle_size/2) for _ in range(self.obstacles)]
+        self.max_obstacle_size = self.dist/4
+        size_array = [random.randint(0,int(self.max_obstacle_size/2)) for _ in range(self.obstacles)]
         start = 0
         for size in size_array:
             end = random.randint(start,start+size)
@@ -54,39 +67,50 @@ class GolfEnv(gym.Env):
         self.obstacles_array.append([start,self.dist])
 
     def step(self,action):
-        exceeded = False
-        club, velocity = action
-        angle = self.clubs[club]
+
+        velocity = action
+        # club, velocity = action
+        # angle = self.clubs[club]
+        angle = self.clubs[1]
         distance = self.calcLocation(velocity, angle)
 
         self.curr += distance
-        if self.curr > self.dist:
-            exceeded = True
 
         trapped = True
         for tuple in self.obstacles_array:
             if self.curr>tuple[0] and self.curr<tuple[1]:
                 trapped = False
                 break
-        if trapped:
-            exceeded = True
-        self.runtime +=1
 
-        if self.runtime>self.steps:
-            exceeded = True
-        if exceeded:
-            return self._get_obs(), -1, True, {}
+        # exceeded bounds
+        if self.curr<0:
+            print("backwards")
+            output = np.array([1]*(2*(self.obstacles+1)))
+            output = np.append(output,self.wind)
+            return output, -1, True, {}
+        elif self.curr>self.dist:
+            print("over")
+            output = np.array([1]*(2*(self.obstacles+1)))
+            output = np.append(output,self.wind)
+            return output, -1, True, {}
 
         distance = abs(self.dist-self.curr)
         if distance < self.reached:
             return self._get_obs(), 1, True, {}
         else:
+            self.runtime +=1
+
+            # trapped or exceeded max steps
+            if trapped or self.runtime>=self.steps:
+                return self._get_obs(), -1, True, {}
+
             obs = self._get_obs()
-            self.wind = random.randint(-15, 15)
-            return obs, distance/self.dist, False, {}
+            self.wind = random.randint(-5, 5)
+            return obs, 1-distance/self.dist, False, {}
 
     def _get_obs(self):
         temp = np.array(self.obstacles_array)-self.curr
+        temp = np.abs(temp)/self.dist
         temp = np.append(temp,self.wind)
         return temp
 
@@ -106,7 +130,7 @@ class GolfEnv(gym.Env):
         return horizontal_dist
 
     def reset(self):
-        self.wind = random.randint(-15, 15)
+        self.wind = random.randint(-5, 5)
         self.runtime = 0
         self.dist = 0
         self.curr = 0
@@ -116,5 +140,16 @@ class GolfEnv(gym.Env):
 
 if __name__ == "__main__":
     env = GolfEnv()
+    print(env._get_obs())
     for i in range(20):
-        env.step([1,10])
+        obs,reward, bool, _ = env.step(25)
+        if(bool and reward ==-1):
+            print("backwards or exceeded")
+            print(obs, reward)
+            break
+        elif(bool and reward==1):
+            print("success")
+            print(obs,reward)
+            break
+        else:
+            print(obs,reward)
