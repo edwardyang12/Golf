@@ -43,9 +43,9 @@ class GolfEnv(gym.Env):
 
         # first iteration just power no golf clubs
         self.action_space = spaces.Box(low=np.array([0]),high=np.array([50]))
-        high = np.array([1]*(2*(self.obstacles+1)))
+        high = np.array([self.max_dist]*(2*(self.obstacles+1)))
         high = np.append(high,5)
-        low = np.array([0]*(2*(self.obstacles+1)))
+        low = np.array([-self.max_dist]*(2*(self.obstacles+1)))
         low = np.append(low,-5)
         self.observation_space = spaces.Box(
             low = low,
@@ -86,12 +86,12 @@ class GolfEnv(gym.Env):
         # exceeded bounds
         if self.curr<0:
             print("backwards")
-            output = np.array([1]*(2*(self.obstacles+1)))
+            output = np.array([self.max_dist]*(2*(self.obstacles+1)))
             output = np.append(output,self.wind)
             return output, -1, True, {}
         elif self.curr>self.dist:
             print("over")
-            output = np.array([1]*(2*(self.obstacles+1)))
+            output = np.array([-self.max_dist]*(2*(self.obstacles+1)))
             output = np.append(output,self.wind)
             return output, -1, True, {}
 
@@ -111,12 +111,12 @@ class GolfEnv(gym.Env):
 
     def _get_obs(self):
         temp = np.array(self.obstacles_array)-self.curr
-        temp = np.abs(temp)/self.dist
         temp = np.append(temp,self.wind)
         return temp
 
     def calcLocation(self, velocity, angle):
 
+        wind = self.wind * time
         horizontal_vel = velocity * math.cos(angle * math.pi / 180)
         vertical_vel = velocity * math.sin(angle * math.pi / 180)
         horizontal_dist = 0
@@ -126,7 +126,7 @@ class GolfEnv(gym.Env):
             horizontal_dist = horizontal_vel * time + horizontal_dist
             vertical_dist = vertical_vel * time + vertical_dist
             vertical_vel = vertical_vel + gravity * time
-            horizontal_vel = horizontal_vel + self.wind
+            horizontal_vel = horizontal_vel + wind
 
         return horizontal_dist
 
@@ -137,6 +137,7 @@ class GolfEnv(gym.Env):
         self.curr = 0
         self.obstacles_array = []
         self.generate_track()
+        self.path = []
         return self._get_obs()
 
     def render(self, mode='human', close=False):
