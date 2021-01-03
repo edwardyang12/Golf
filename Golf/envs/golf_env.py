@@ -3,6 +3,7 @@ from gym import spaces
 import math
 import random
 import numpy as np
+from visualizer import Viewer
 
 # 2D golf where objective is for player to put the ball into the hole
 # farthest can launch ball is shorter than distance to hole
@@ -32,17 +33,19 @@ class GolfEnv(gym.Env):
     def __init__(self):
         super(GolfEnv,self).__init__()
 
+
+
         ''' for golf course initialization stuff '''
         self.max_dist = 2000 # meters of longest track
         self.clubs = {0:10,1:27,2:42,3:60}
         self.min_dist = 400
         self.reached = 5 # within 5 meters means u got it
-        self.obstacles = 0 # traps
+        self.obstacles = 1 # traps
         self.steps = 10 # only get 10 golf swings
 
 
         # first iteration just power no golf clubs
-        self.action_space = spaces.Box(low=np.array([0]),high=np.array([50]))
+        self.action_space = spaces.Box(low=np.array([0]),high=np.array([70]))
         high = np.array([self.max_dist]*(2*(self.obstacles+1)))
         high = np.append(high,5)
         low = np.array([-self.max_dist]*(2*(self.obstacles+1)))
@@ -52,6 +55,8 @@ class GolfEnv(gym.Env):
             high = high,
             dtype=np.float32
         )
+
+        self.viewer = None
 
         self.reset()
 
@@ -65,10 +70,16 @@ class GolfEnv(gym.Env):
             self.obstacles_array.append([start,end])
             start = 2*end
         self.obstacles_array.append([start,self.dist])
+        print(self.obstacles_array)
 
     def step(self,action):
 
-        velocity = action
+        velocity = action[0]
+
+        self.vel_list.append(velocity)
+        self.club_list.append(1)
+        self.wind_list.append(self.wind)
+
         # club, velocity = action
         # angle = self.clubs[club]
         angle = self.clubs[1]
@@ -89,11 +100,6 @@ class GolfEnv(gym.Env):
             output = np.array([self.max_dist]*(2*(self.obstacles+1)))
             output = np.append(output,self.wind)
             return output, -1, True, {}
-        elif self.curr>self.dist:
-            print("over")
-            output = np.array([-self.max_dist]*(2*(self.obstacles+1)))
-            output = np.append(output,self.wind)
-            return output, -1, True, {}
 
         distance = abs(self.dist-self.curr)
         if distance < self.reached:
@@ -104,6 +110,12 @@ class GolfEnv(gym.Env):
             # trapped or exceeded max steps
             if trapped or self.runtime>=self.steps:
                 return self._get_obs(), -1, True, {}
+
+            elif self.curr>self.dist:
+                print("over")
+                output = np.array([-self.max_dist]*(2*(self.obstacles+1)))
+                output = np.append(output,self.wind)
+                return output, -1, True, {}
 
             obs = self._get_obs()
             self.wind = random.randint(-5, 5)
@@ -138,10 +150,25 @@ class GolfEnv(gym.Env):
         self.obstacles_array = []
         self.generate_track()
         self.path = []
+        self.vel_list = []
+        self.club_list = []
+        self.wind_list = []
+        self.waypoint = 0
+        self.close()
         return self._get_obs()
 
+    def close(self):
+        if self.viewer:
+            self.viewer.clear()
+            self.viewer = None
+
     def render(self, mode='human', close=False):
+        temp = np.array(self.obstacles_array).flatten().tolist()
+        print(temp)
         if not close:
+            if self.viewer is None:
+                self.viewer = Viewer(self.dist,temp)
+            self.viewer.sim(self.vel_list, self.club_list, self.wind_list)
             print("target: " + str(self.dist))
             print("path: " + str(self.path))
 
@@ -160,3 +187,4 @@ if __name__ == "__main__":
             break
         else:
             print(obs,reward)
+    env.render()
