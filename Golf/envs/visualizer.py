@@ -100,9 +100,9 @@ if __name__ == '__main__':
 
     # resizer('bg.png',(2500, 500))
     # resizer('ball.png',(40, 40))
-    velocity = [70,70,50]
-    club = [2,1,2]
-    wind = [-5,-5,-5]
+    velocity = [70,70,70,35]
+    club = [2,1,2,2]
+    wind = [-5,-5,5,-5]
 
     viewer = Viewer(1500,[0,500,750,1000,1250,1500])
 

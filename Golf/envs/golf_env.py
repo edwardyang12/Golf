@@ -3,7 +3,7 @@ from gym import spaces
 import math
 import random
 import numpy as np
-from visualizer import Viewer
+from Golf.envs.visualizer import Viewer
 
 # 2D golf where objective is for player to put the ball into the hole
 # farthest can launch ball is shorter than distance to hole
@@ -25,6 +25,7 @@ driver = 10 -> 0
 lofting wedge = 60 -> 3
 '''
 
+
 time = 0.01
 gravity = -9.81
 
@@ -33,8 +34,6 @@ class GolfEnv(gym.Env):
     def __init__(self):
         super(GolfEnv,self).__init__()
 
-
-
         ''' for golf course initialization stuff '''
         self.max_dist = 2000 # meters of longest track
         self.clubs = {0:10,1:27,2:42,3:60}
@@ -42,7 +41,6 @@ class GolfEnv(gym.Env):
         self.reached = 5 # within 5 meters means u got it
         self.obstacles = 1 # traps
         self.steps = 10 # only get 10 golf swings
-
 
         # first iteration just power no golf clubs
         self.action_space = spaces.Box(low=np.array([0]),high=np.array([70]))
@@ -63,12 +61,12 @@ class GolfEnv(gym.Env):
     def generate_track(self):
         self.dist = random.randint(self.min_dist,self.max_dist)
         self.max_obstacle_size = self.dist/4
-        size_array = [random.randint(0,int(self.max_obstacle_size/2)) for _ in range(self.obstacles)]
+        size_array = [random.randint(0,int(self.max_obstacle_size)) for _ in range(self.obstacles)]
         start = 0
         for size in size_array:
             end = random.randint(start,start+size)
             self.obstacles_array.append([start,end])
-            start = 2*end
+            start = end+size
         self.obstacles_array.append([start,self.dist])
         print(self.obstacles_array)
 
@@ -96,7 +94,6 @@ class GolfEnv(gym.Env):
 
         # exceeded bounds
         if self.curr<0:
-            print("backwards")
             output = np.array([self.max_dist]*(2*(self.obstacles+1)))
             output = np.append(output,self.wind)
             return output, -1, True, {}
@@ -112,14 +109,14 @@ class GolfEnv(gym.Env):
                 return self._get_obs(), -1, True, {}
 
             elif self.curr>self.dist:
-                print("over")
                 output = np.array([-self.max_dist]*(2*(self.obstacles+1)))
                 output = np.append(output,self.wind)
                 return output, -1, True, {}
 
             obs = self._get_obs()
             self.wind = random.randint(-5, 5)
-            return obs, 1-distance/self.dist, False, {}
+            penalty = 1.0 # can change later 0.95 seems good
+            return obs, (1-distance/self.dist)-penalty, False, {}
 
     def _get_obs(self):
         temp = np.array(self.obstacles_array)-self.curr
@@ -176,7 +173,7 @@ if __name__ == "__main__":
     env = GolfEnv()
     print(env._get_obs())
     for i in range(20):
-        obs,reward, bool, _ = env.step(25)
+        obs,reward, bool, _ = env.step([25])
         if(bool and reward ==-1):
             print("backwards or exceeded")
             print(obs, reward)
