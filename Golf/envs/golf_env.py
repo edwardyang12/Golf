@@ -7,16 +7,13 @@ from Golf.envs.visualizer import Viewer
 
 # 2D golf where objective is for player to put the ball into the hole
 # farthest can launch ball is shorter than distance to hole
-# Start and end height constant
 # Wind changes per hit
+# hilly terrain so height changes
 # Different clubs with different amounts of "power" and different preset angles
 # intuition is that with these different angles, wind will affect them by different amounts
-# Outputs: distance to hole and to each trap state
 # Input: which club to use and how far to launch
+# Outputs: distance to hole, current height, wind
 
-# next iteration will add these:
-# Must avoid traps held constant per map
-# map of where ball is (including traps),
 
 '''
 driver = 10 -> 0
@@ -24,7 +21,6 @@ driver = 10 -> 0
 9- iron = 42 -> 2
 lofting wedge = 60 -> 3
 '''
-
 
 time = 0.01
 gravity = -9.81
@@ -35,19 +31,16 @@ class GolfEnv(gym.Env):
         super(GolfEnv,self).__init__()
 
         ''' for golf course initialization stuff '''
-        self.max_dist = 2000 # meters of longest track
         self.clubs = {0:10,1:27,2:42,3:60}
-        self.min_dist = 400
         self.reached = 5 # within 5 meters means u got it
-        self.obstacles = 1 # traps
         self.steps = 10 # only get 10 golf swings
+        self.dist = 1250
+        self.target_height = self.func(1250)
 
-        # first iteration just power no golf clubs
-        self.action_space = spaces.Box(low=np.array([0]),high=np.array([70]))
-        high = np.array([self.max_dist]*(2*(self.obstacles+1)))
-        high = np.append(high,5)
-        low = np.array([-self.max_dist]*(2*(self.obstacles+1)))
-        low = np.append(low,-5)
+        self.action_space = spaces.Box(low=np.array([-25,0]),high=np.array([50,3]))
+        high = np.array([self.dist+200,230,5])
+        low = np.array([0,-185,-5])
+
         self.observation_space = spaces.Box(
             low = low,
             high = high,
@@ -58,99 +51,103 @@ class GolfEnv(gym.Env):
 
         self.reset()
 
-    def generate_track(self):
-        self.dist = random.randint(self.min_dist,self.max_dist)
-        self.max_obstacle_size = self.dist/4
-        size_array = [random.randint(0,int(self.max_obstacle_size)) for _ in range(self.obstacles)]
-        start = 0
-        for size in size_array:
-            end = random.randint(start,start+size)
-            self.obstacles_array.append([start,end])
-            start = end+size
-        self.obstacles_array.append([start,self.dist])
-        print(self.obstacles_array)
-
     def step(self,action):
-
+        
+        club = int(round(action[1]))
         velocity = action[0]
 
         self.vel_list.append(velocity)
-        self.club_list.append(1)
+        self.club_list.append(club)
         self.wind_list.append(self.wind)
 
-        # club, velocity = action
-        # angle = self.clubs[club]
-        angle = self.clubs[1]
-        distance = self.calcLocation(velocity, angle)
+        angle = self.clubs[club]
+        distance,height = self.calcLocation(velocity, angle)
 
-        self.curr += distance
+        self.height = height
+        self.curr = distance
         self.path.append(self.curr)
 
-        trapped = True
-        for tuple in self.obstacles_array:
-            if self.curr>tuple[0] and self.curr<tuple[1]:
-                trapped = False
-                break
-
-        # exceeded bounds
-        if self.curr<0:
-            output = np.array([self.max_dist]*(2*(self.obstacles+1)))
-            output = np.append(output,self.wind)
-            return output, -1, True, {}
-
+        #distance = math.sqrt((self.dist-self.curr)**2 + (self.height-self.target_height)**2)
         distance = abs(self.dist-self.curr)
         if distance < self.reached:
             return self._get_obs(), 1, True, {}
         else:
             self.runtime +=1
 
-            # trapped or exceeded max steps
-            if trapped or self.runtime>=self.steps:
+            # exceeded max steps
+            if self.runtime>=self.steps:
                 return self._get_obs(), -1, True, {}
 
-            elif self.curr>self.dist:
-                output = np.array([-self.max_dist]*(2*(self.obstacles+1)))
-                output = np.append(output,self.wind)
+            # exceeded bounds
+            elif self.curr>self.dist+200:
+                
+                output = np.array([self.dist+200,0,self.wind])
+                return output, -1, True, {}
+            
+            elif self.curr<0:
+                output = np.array([0,0,self.wind])
                 return output, -1, True, {}
 
             obs = self._get_obs()
-            self.wind = random.randint(-5, 5)
-            penalty = 1.0 # can change later 0.95 seems good
+            self.wind = random.uniform(-5, 5)
+            penalty = 0.95 # 0.95 is good
+            # 1255 is max euclidian distance
             return obs, (1-distance/self.dist)-penalty, False, {}
 
     def _get_obs(self):
-        temp = np.array(self.obstacles_array)-self.curr
-        temp = np.append(temp,self.wind)
+        # temp = np.array([self.dist-self.curr,self.target_height-self.height,self.wind])
+        temp = np.array([self.curr,self.height,self.wind])
         return temp
+
+    def wind_effect(self, wind, vertical_dist):
+        if(vertical_dist>100):
+            return wind* 2.5
+        elif(vertical_dist>75):
+            return wind*2
+        elif(vertical_dist>50):
+            return wind*1.5
+        elif(vertical_dist>25):
+            return wind*1
+        elif(vertical_dist>0):
+            return wind*0.5
+        else:
+            return 0    
+
+    def func(self,x):
+        #return (0.8*x-175)*(x-400)*(x+300)*(x-1400)*(x-1210)*(x+400)*(x-800)*(x-1100)*x/(10**22)+50
+        return 0
 
     def calcLocation(self, velocity, angle):
 
-        wind = self.wind * time
         horizontal_vel = velocity * math.cos(angle * math.pi / 180)
         vertical_vel = velocity * math.sin(angle * math.pi / 180)
-        horizontal_dist = 0
-        vertical_dist = 0
+        horizontal_dist = self.curr
+        vertical_dist = self.height
 
-        while((vertical_dist> 0) or (vertical_vel>0)):
+        while((vertical_dist-self.func(horizontal_dist))>=0 or (vertical_vel>0)):
+            
+            wind = self.wind_effect(self.wind * time, vertical_dist)
             horizontal_dist = horizontal_vel * time + horizontal_dist
             vertical_dist = vertical_vel * time + vertical_dist
             vertical_vel = vertical_vel + gravity * time
-            horizontal_vel = horizontal_vel + wind
+            if((horizontal_vel>0 and wind>0) or (horizontal_vel<0 and wind<0) ):
+                if(abs(horizontal_vel)<abs((wind)/time)):
+                    horizontal_vel = horizontal_vel + wind
+            else:
+                horizontal_vel = horizontal_vel + wind
 
-        return horizontal_dist
+        horizontal_dist, vertical_dist = (horizontal_dist, self.func(horizontal_dist))
+        return horizontal_dist,vertical_dist
 
     def reset(self):
-        self.wind = random.randint(-5, 5)
+        self.wind = random.uniform(-5, 5)
         self.runtime = 0
-        self.dist = 0
         self.curr = 0
-        self.obstacles_array = []
-        self.generate_track()
+        self.height = 0
         self.path = []
         self.vel_list = []
         self.club_list = []
         self.wind_list = []
-        self.waypoint = 0
         self.close()
         return self._get_obs()
 
@@ -160,20 +157,16 @@ class GolfEnv(gym.Env):
             self.viewer = None
 
     def render(self, mode='human', close=False):
-        temp = np.array(self.obstacles_array).flatten().tolist()
-        print(temp)
         if not close:
             if self.viewer is None:
-                self.viewer = Viewer(self.dist,temp)
+                self.viewer = Viewer(self.dist)
             self.viewer.sim(self.vel_list, self.club_list, self.wind_list)
-            print("target: " + str(self.dist))
-            print("path: " + str(self.path))
 
 if __name__ == "__main__":
     env = GolfEnv()
     print(env._get_obs())
     for i in range(20):
-        obs,reward, bool, _ = env.step([25])
+        obs,reward, bool, _ = env.step([70,1])
         if(bool and reward ==-1):
             print("backwards or exceeded")
             print(obs, reward)
@@ -182,6 +175,4 @@ if __name__ == "__main__":
             print("success")
             print(obs,reward)
             break
-        else:
-            print(obs,reward)
-    env.render()
+    print(env.path)

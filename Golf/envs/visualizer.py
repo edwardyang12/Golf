@@ -10,8 +10,8 @@ def resizer(image, dimensions):
 
 
 class Viewer:
-    def __init__(self, target, traps, horizontal_dist = -1000, time = 0.01):
-        turtle.screensize(2500, 500, 'white')
+    def __init__(self, target, horizontal_dist = -1000, time = 0.01):
+        turtle.screensize(2500, 350, 'white')
         self.screen = turtle.Screen()
         self.theTurtle = turtle.Turtle()
         self.initial = (horizontal_dist, 0)
@@ -20,68 +20,81 @@ class Viewer:
         self.clubs = {0:10,1:27,2:42,3:60}
         self.curr = self.initial
         self.target = target
-        self.trap = traps
-        self.drawBg(target, traps)
+        self.drawBg(target)
 
-    def drawBg(self, target, traps, ball = 'ball.gif', bg = 'bg.png'):
-        self.screen.bgpic('bg.png')
+    def drawBg(self, target, ball = 'ball.gif', bg = 'bg.png'):
+        self.screen.bgpic("Golf/envs/bg.png")
         self.screen.update()
-        self.screen.addshape("ball.gif")
-        self.theTurtle.shape("ball.gif")
+        self.screen.addshape("Golf/envs/ball.gif")
+        self.theTurtle.shape("Golf/envs/ball.gif")
         self.theTurtle.penup()
         self.theTurtle.setpos(self.initial)
         self.theTurtle.pendown()
         targetTurtle = turtle.Turtle()
-        self.screen.addshape("flag.gif")
+        self.screen.addshape("Golf/envs/flag.gif")
         targetTurtle.penup()
-        targetTurtle.shape("flag.gif")
+        targetTurtle.shape("Golf/envs/flag.gif")
 
-
-        start = True
-        before = self.initial[0]
-        for i in range(1,len(traps)):
-            temp = traps[i] - 1000
-            if start:
-                start = False
-                targetTurtle.penup()
-                targetTurtle.setpos(temp,-25)
-                targetTurtle.pendown()
-            else:
-                start = True
-                targetTurtle.fillcolor("blue")
-                targetTurtle.begin_fill()
-                for z in [temp-before,100,temp-before,100]:
-                    targetTurtle.forward(z)
-                    targetTurtle.right(90)
-                targetTurtle.end_fill()
-                targetTurtle.penup()
-            before = traps[i] - 1000
+        temp = -1000
+        targetTurtle.setpos(temp,0)
+        targetTurtle.pendown()
+        for i in range(target+100):
+            targetTurtle.setpos(temp+i,self.func(i))
         targetTurtle.penup()
-        targetTurtle.setpos((target-1000,25))
+        targetTurtle.setpos(self.target-1000,self.func(self.target)+65)
 
+    def func(self,x):
+        return (x-175)*(x-400)*(x+300)*(x-1400)*(x-1210)*(x+400)*(x-800)*(x-1100)*x/(10**22)
 
     def sim(self, vel_list, club_list, wind_list):
         for i in range(len(vel_list)):
             self.move(vel_list[i],self.clubs[club_list[i]], wind_list[i])
         self.end_episode()
 
+    def wind_effect(self, wind, vertical_dist):
+        if(vertical_dist>100):
+            return wind* 3
+        elif(vertical_dist>75):
+            return wind*2.5
+        elif(vertical_dist>50):
+            return wind*2
+        elif(vertical_dist>25):
+            return wind*1.5
+        elif(vertical_dist>0):
+            return wind
+        else:
+            return 0
+
     # simulates one arrow shot
     def move(self, velocity, angle, wind):
-        wind = wind * self.time
+        self.theTurtle.pendown()
         horizontal_vel = velocity * math.cos(angle * math.pi / 180)
         vertical_vel = velocity * math.sin(angle * math.pi / 180)
         horizontal_dist = self.curr[0]
         vertical_dist = self.curr[1]
-        while((vertical_dist>=0) or (vertical_vel>0)):
-
+        while((vertical_dist-self.func(horizontal_dist+1000))>=0 or (vertical_vel>0)):
+            temp = self.wind_effect(wind * self.time, vertical_dist)
             self.theTurtle.setpos(horizontal_dist,vertical_dist)
             horizontal_dist = horizontal_vel * self.time + horizontal_dist
             vertical_dist = vertical_vel * self.time + vertical_dist
             vertical_vel = vertical_vel + self.gravity * self.time
-            horizontal_vel = horizontal_vel + wind
-        self.curr = (horizontal_dist, vertical_dist)
-        print(horizontal_dist)
+            if((horizontal_vel>0 and temp>0) or (horizontal_vel<0 and temp<0) ):
+                if(abs(horizontal_vel)<abs((temp)/self.time)):
+                    horizontal_vel = horizontal_vel + temp
+            else:
+                horizontal_vel = horizontal_vel + temp
 
+            if(horizontal_dist<-1000):
+                self.theTurtle.penup()
+                self.theTurtle.setpos(-1000,0)
+                horizontal_dist, vertical_dist = -1000, 0
+                break
+
+        self.theTurtle.penup()
+        self.theTurtle.setpos(horizontal_dist, self.func(horizontal_dist+1000))
+        horizontal_dist, vertical_dist = (horizontal_dist, self.func(horizontal_dist+1000))
+        self.curr = (horizontal_dist, vertical_dist)
+        
     # freeze turtle screen
     def freeze_screen(self):
         turtle.mainloop()
@@ -100,11 +113,11 @@ if __name__ == '__main__':
 
     # resizer('bg.png',(2500, 500))
     # resizer('ball.png',(40, 40))
-    velocity = [70,70,70,35]
-    club = [2,1,2,2]
-    wind = [-5,-5,5,-5]
+    velocity = [70,70,70,70]
+    club = [3,0,1,3]
+    wind = [5,-5,-5,5]
 
-    viewer = Viewer(1500,[0,500,750,1000,1250,1500])
+    viewer = Viewer(1250)
 
     viewer.sim(velocity, club, wind)
     viewer.freeze_screen()
