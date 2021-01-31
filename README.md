@@ -1,1 +1,3 @@
 # Golf
+
+openAI golf environment
