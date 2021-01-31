@@ -14,7 +14,7 @@ class Viewer:
         turtle.screensize(2500, 350, 'white')
         self.screen = turtle.Screen()
         self.theTurtle = turtle.Turtle()
-        self.initial = (horizontal_dist, 0)
+        self.initial = (horizontal_dist, self.func(0))
         self.gravity = -9.81
         self.time = time
         self.clubs = {0:10,1:27,2:42,3:60}
@@ -36,7 +36,7 @@ class Viewer:
         targetTurtle.shape("Golf/envs/flag.gif")
 
         temp = -1000
-        targetTurtle.setpos(temp,0)
+        targetTurtle.setpos(temp,self.func(0))
         targetTurtle.pendown()
         for i in range(target+100):
             targetTurtle.setpos(temp+i,self.func(i))
@@ -44,8 +44,8 @@ class Viewer:
         targetTurtle.setpos(self.target-1000,self.func(self.target)+65)
 
     def func(self,x):
-        return (x-175)*(x-400)*(x+300)*(x-1400)*(x-1210)*(x+400)*(x-800)*(x-1100)*x/(10**22)
-
+        return (0.8*x-175)*(x-400)*(x+300)*(x-1400)*(x-1210)*(x+400)*(x-800)*(x-1100)*x/(10**22.3)+25
+        
     def sim(self, vel_list, club_list, wind_list):
         for i in range(len(vel_list)):
             self.move(vel_list[i],self.clubs[club_list[i]], wind_list[i])
@@ -53,17 +53,17 @@ class Viewer:
 
     def wind_effect(self, wind, vertical_dist):
         if(vertical_dist>100):
-            return wind* 3
+            return wind* 2.5
         elif(vertical_dist>75):
-            return wind*2.5
-        elif(vertical_dist>50):
             return wind*2
-        elif(vertical_dist>25):
+        elif(vertical_dist>50):
             return wind*1.5
+        elif(vertical_dist>25):
+            return wind*1
         elif(vertical_dist>0):
-            return wind
+            return wind*0.5
         else:
-            return 0
+            return 0    
 
     # simulates one arrow shot
     def move(self, velocity, angle, wind):
@@ -72,7 +72,7 @@ class Viewer:
         vertical_vel = velocity * math.sin(angle * math.pi / 180)
         horizontal_dist = self.curr[0]
         vertical_dist = self.curr[1]
-        while((vertical_dist-self.func(horizontal_dist+1000))>=0 or (vertical_vel>0)):
+        while((vertical_dist-self.func(horizontal_dist+1000))>=0):
             temp = self.wind_effect(wind * self.time, vertical_dist)
             self.theTurtle.setpos(horizontal_dist,vertical_dist)
             horizontal_dist = horizontal_vel * self.time + horizontal_dist
@@ -89,7 +89,6 @@ class Viewer:
                 self.theTurtle.setpos(-1000,0)
                 horizontal_dist, vertical_dist = -1000, 0
                 break
-
         self.theTurtle.penup()
         self.theTurtle.setpos(horizontal_dist, self.func(horizontal_dist+1000))
         horizontal_dist, vertical_dist = (horizontal_dist, self.func(horizontal_dist+1000))

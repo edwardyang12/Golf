@@ -37,9 +37,9 @@ class GolfEnv(gym.Env):
         self.dist = 1250
         self.target_height = self.func(1250)
 
-        self.action_space = spaces.Box(low=np.array([-25,0]),high=np.array([50,3]))
-        high = np.array([self.dist+200,230,5])
-        low = np.array([0,-185,-5])
+        self.action_space = spaces.Box(low=np.array([0,0]),high=np.array([70,3]))
+        high = np.array([self.dist+100,110,5])
+        low = np.array([0,-140,-5])
 
         self.observation_space = spaces.Box(
             low = low,
@@ -76,22 +76,22 @@ class GolfEnv(gym.Env):
 
             # exceeded max steps
             if self.runtime>=self.steps:
-                return self._get_obs(), -1, True, {}
+                return self._get_obs(), -1.5, True, {}
 
             # exceeded bounds
-            elif self.curr>self.dist+200:
+            elif self.curr>self.dist+100:
                 
-                output = np.array([self.dist+200,0,self.wind])
-                return output, -1, True, {}
+                output = np.array([self.dist+100,0,self.wind])
+                return output, -2, True, {}
             
             elif self.curr<0:
                 output = np.array([0,0,self.wind])
-                return output, -1, True, {}
+                return output, -2, True, {}
 
             obs = self._get_obs()
             self.wind = random.uniform(-5, 5)
             penalty = 0.95 # 0.95 is good
-            # 1255 is max euclidian distance
+   
             return obs, (1-distance/self.dist)-penalty, False, {}
 
     def _get_obs(self):
@@ -114,8 +114,8 @@ class GolfEnv(gym.Env):
             return 0    
 
     def func(self,x):
-        #return (0.8*x-175)*(x-400)*(x+300)*(x-1400)*(x-1210)*(x+400)*(x-800)*(x-1100)*x/(10**22)+50
-        return 0
+        return (0.8*x-175)*(x-400)*(x+300)*(x-1400)*(x-1210)*(x+400)*(x-800)*(x-1100)*x/(10**22.3)+25
+        # return 0
 
     def calcLocation(self, velocity, angle):
 
@@ -123,9 +123,8 @@ class GolfEnv(gym.Env):
         vertical_vel = velocity * math.sin(angle * math.pi / 180)
         horizontal_dist = self.curr
         vertical_dist = self.height
+        while((vertical_dist-self.func(horizontal_dist))>=0):
 
-        while((vertical_dist-self.func(horizontal_dist))>=0 or (vertical_vel>0)):
-            
             wind = self.wind_effect(self.wind * time, vertical_dist)
             horizontal_dist = horizontal_vel * time + horizontal_dist
             vertical_dist = vertical_vel * time + vertical_dist
@@ -143,7 +142,7 @@ class GolfEnv(gym.Env):
         self.wind = random.uniform(-5, 5)
         self.runtime = 0
         self.curr = 0
-        self.height = 0
+        self.height = self.func(self.curr)
         self.path = []
         self.vel_list = []
         self.club_list = []
